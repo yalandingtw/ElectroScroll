@@ -121,7 +121,7 @@ public sealed class ScrollController : IDisposable
             var dt = _lastWheelMs > 0 ? Clamp(now - _lastWheelMs, 8, 240) : 80;
             var notches = wheelDelta / (double)NativeMethods.WHEEL_DELTA;
             var direction = Math.Sign(notches);
-            var sameWindow = _target.Hwnd == target.Hwnd;
+            var sameWindow = _target.RootHwnd != 0 && _target.RootHwnd == target.RootHwnd;
             if (direction != 0 && _brakeTicksRemaining > 0 && direction == _brakeDirection && now <= _brakeUntilMs)
             {
                 _target = target;
@@ -331,8 +331,7 @@ public sealed class ScrollController : IDisposable
             return;
         }
 
-        var substeps = Math.Clamp(tuning.Smoothness, 1, 8);
-        var quantum = 1.0 / substeps;
+        var quantum = GetOutputQuantum(tuning.Smoothness);
         var emitted = 0;
 
         while (Math.Abs(_accumulator) >= quantum && emitted < 20)
@@ -393,6 +392,12 @@ public sealed class ScrollController : IDisposable
     {
         return string.Equals(profile.Name, "Codex Desktop", StringComparison.OrdinalIgnoreCase)
             || !IsPrimaryMonitor(point);
+    }
+
+    private static double GetOutputQuantum(int smoothness)
+    {
+        var substeps = Math.Clamp(smoothness, 1, 8);
+        return substeps == 1 ? 1.0 : 1.0 / (substeps * 4.0);
     }
 
     private void ResetMotionLocked()
