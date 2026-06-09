@@ -102,21 +102,29 @@ public sealed class ScrollController : IDisposable
             TrackInputSignalLocked(wheelDelta, now);
         }
 
-        var target = _resolver.Resolve(point);
+        var resolvePoint = GetResolvePoint(point, out var cursorPoint, out var hasCursorPoint);
+        var target = _resolver.Resolve(resolvePoint);
+        if (target.IsEmpty && !SamePoint(resolvePoint, point))
+        {
+            target = _resolver.Resolve(point);
+            resolvePoint = point;
+        }
+
         if (target.IsEmpty)
         {
+            ResetMotion();
             if (IsDiagnosticsLoggingEnabled)
             {
-                _logger!.Log("target-empty", $"delta={wheelDelta} pt={FormatPoint(point)}");
+                _logger!.Log("target-empty", $"delta={wheelDelta} hookPt={FormatPoint(point)} cursorPt={FormatOptionalPoint(cursorPoint, hasCursorPoint)}");
             }
 
-            PublishMetrics(false, target, "Native", point);
+            PublishMetrics(false, target, "Native", resolvePoint);
             return false;
         }
 
         if (IsDiagnosticsLoggingEnabled)
         {
-            _logger!.Log("wheel", $"delta={wheelDelta} pt={FormatPoint(point)} target={DescribeTarget(target)}");
+            _logger!.Log("wheel", $"delta={wheelDelta} hookPt={FormatPoint(point)} cursorPt={FormatOptionalPoint(cursorPoint, hasCursorPoint)} resolvePt={FormatPoint(resolvePoint)} target={DescribeTarget(target)}");
         }
 
         var guard = _interferenceGuard.Evaluate(target, now);
@@ -156,7 +164,7 @@ public sealed class ScrollController : IDisposable
             if (direction != 0 && _brakeTicksRemaining > 0 && direction == _brakeDirection && now <= _brakeUntilMs)
             {
                 _target = target;
-                _targetPoint = point;
+                _targetPoint = resolvePoint;
                 _activeProfile = profile;
                 _lastWheelMs = now;
                 _lastDirection = direction;
@@ -192,7 +200,7 @@ public sealed class ScrollController : IDisposable
                 if (wasInertial)
                 {
                     _target = target;
-                    _targetPoint = point;
+                    _targetPoint = resolvePoint;
                     _activeProfile = profile;
                     _lastWheelMs = now;
                     _lastDirection = direction;
@@ -223,7 +231,7 @@ public sealed class ScrollController : IDisposable
             }
 
             _target = target;
-            _targetPoint = point;
+            _targetPoint = resolvePoint;
             _activeProfile = profile;
             _lastWheelMs = now;
             _lastDirection = direction == 0 ? _lastDirection : direction;
@@ -577,6 +585,15 @@ public sealed class ScrollController : IDisposable
         return $"pt=({point.X},{point.Y}) mon={DescribeMonitor(point)} hwnd={FormatHwnd(target.Hwnd)} root={FormatHwnd(target.RootHwnd)} fg={FormatHwnd(NativeMethods.GetForegroundWindow())} out={FormatHwnd(outputHwnd)}";
     }
 
+    private static NativeMethods.POINT GetResolvePoint(
+        NativeMethods.POINT hookPoint,
+        out NativeMethods.POINT cursorPoint,
+        out bool hasCursorPoint)
+    {
+        hasCursorPoint = NativeMethods.GetCursorPos(out cursorPoint);
+        return hasCursorPoint ? cursorPoint : hookPoint;
+    }
+
     private static string DescribeTarget(WindowTarget target)
     {
         return $"process={Clean(target.ProcessName)} title={Clean(target.Title)} hwnd={FormatHwnd(target.Hwnd)} root={FormatHwnd(target.RootHwnd)}";
@@ -585,6 +602,16 @@ public sealed class ScrollController : IDisposable
     private static string FormatPoint(NativeMethods.POINT point)
     {
         return $"({point.X},{point.Y})";
+    }
+
+    private static string FormatOptionalPoint(NativeMethods.POINT point, bool hasPoint)
+    {
+        return hasPoint ? FormatPoint(point) : "unavailable";
+    }
+
+    private static bool SamePoint(NativeMethods.POINT left, NativeMethods.POINT right)
+    {
+        return left.X == right.X && left.Y == right.Y;
     }
 
     private static string DescribeMonitor(NativeMethods.POINT point)
