@@ -96,6 +96,9 @@ internal static class NativeMethods
     public static extern nint WindowFromPoint(POINT point);
 
     [DllImport("user32.dll")]
+    public static extern nint WindowFromPhysicalPoint(POINT point);
+
+    [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetCursorPos(out POINT lpPoint);
 

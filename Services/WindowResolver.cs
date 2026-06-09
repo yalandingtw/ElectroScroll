@@ -9,7 +9,12 @@ internal sealed class WindowResolver
 
     public WindowTarget Resolve(NativeMethods.POINT point)
     {
-        var hwnd = NativeMethods.WindowFromPoint(point);
+        var hwnd = NativeMethods.WindowFromPhysicalPoint(point);
+        if (hwnd == 0)
+        {
+            hwnd = NativeMethods.WindowFromPoint(point);
+        }
+
         if (hwnd == 0)
         {
             return WindowTarget.Empty;

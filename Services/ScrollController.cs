@@ -18,6 +18,7 @@ public sealed class ScrollController : IDisposable
     private readonly AppSettings _settings;
 
     private double _lastWheelMs;
+    private double _lastRawWheelMs;
     private double _lastFrameMs;
     private double _speedEma;
     private double _boost = 1.0;
@@ -87,9 +88,15 @@ public sealed class ScrollController : IDisposable
         }
 
         var now = NowMs;
+        lock (_gate)
+        {
+            TrackInputSignalLocked(wheelDelta, now);
+        }
+
         var target = _resolver.Resolve(point);
         if (target.IsEmpty)
         {
+            PublishMetrics(false, target, "Native", point);
             return false;
         }
 
@@ -353,6 +360,14 @@ public sealed class ScrollController : IDisposable
         _outputSignal = Math.Min(6, _outputSignal + Math.Abs(delta) / (double)NativeMethods.WHEEL_DELTA);
     }
 
+    private void TrackInputSignalLocked(int wheelDelta, double now)
+    {
+        var dt = _lastRawWheelMs > 0 ? Clamp(now - _lastRawWheelMs, 8, 240) : 80;
+        var notches = Math.Abs(wheelDelta / (double)NativeMethods.WHEEL_DELTA);
+        _inputSignal = Math.Max(_inputSignal, notches / dt);
+        _lastRawWheelMs = now;
+    }
+
     private void EmitPostMessageWheel(int delta)
     {
         var target = _target;
@@ -388,6 +403,7 @@ public sealed class ScrollController : IDisposable
         _accumulator = 0;
         _glideUntilMs = 0;
         _lastWheelMs = 0;
+        _lastRawWheelMs = 0;
         _brakeUntilMs = 0;
         _burstCount = 0;
         _brakeTicksRemaining = 0;
@@ -427,6 +443,11 @@ public sealed class ScrollController : IDisposable
 
     private void PublishMetrics(bool isIntercepting, WindowTarget target, string status)
     {
+        PublishMetrics(isIntercepting, target, status, _targetPoint);
+    }
+
+    private void PublishMetrics(bool isIntercepting, WindowTarget target, string status, NativeMethods.POINT point)
+    {
         MetricsUpdated?.Invoke(this, new ScrollMetrics(
             _speedEma,
             _boost,
@@ -438,7 +459,7 @@ public sealed class ScrollController : IDisposable
             target.Title,
             isIntercepting,
             status,
-            BuildDiagnostics(target, _targetPoint, _lastOutputHwnd)));
+            BuildDiagnostics(target, point, _lastOutputHwnd)));
     }
 
     private double NowMs => _clock.Elapsed.TotalMilliseconds;
