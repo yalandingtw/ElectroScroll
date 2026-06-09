@@ -18,11 +18,13 @@ internal sealed class WindowResolver
         var target = ResolveWindow(hwnd);
         if (target.IsDesktopShell)
         {
-            var foreground = ResolveWindow(NativeMethods.GetForegroundWindow());
-            if (!foreground.IsEmpty)
+            var topLevelTarget = ResolveTopLevelWindowAt(point);
+            if (!topLevelTarget.IsEmpty)
             {
-                return foreground with { Hwnd = foreground.RootHwnd };
+                return topLevelTarget;
             }
+
+            return WindowTarget.Empty;
         }
 
         return target with { Hwnd = hwnd };
@@ -53,6 +55,48 @@ internal sealed class WindowResolver
         }
 
         return target;
+    }
+
+    private WindowTarget ResolveTopLevelWindowAt(NativeMethods.POINT point)
+    {
+        WindowTarget resolved = WindowTarget.Empty;
+
+        NativeMethods.EnumWindows((hwnd, _) =>
+        {
+            if (!IsCandidateAtPoint(hwnd, point))
+            {
+                return true;
+            }
+
+            var target = ResolveWindow(hwnd);
+            if (target.IsEmpty || target.IsDesktopShell)
+            {
+                return true;
+            }
+
+            resolved = target with { Hwnd = target.RootHwnd };
+            return false;
+        }, 0);
+
+        return resolved;
+    }
+
+    private static bool IsCandidateAtPoint(nint hwnd, NativeMethods.POINT point)
+    {
+        if (hwnd == 0 || !NativeMethods.IsWindowVisible(hwnd) || NativeMethods.IsIconic(hwnd))
+        {
+            return false;
+        }
+
+        if (!NativeMethods.GetWindowRect(hwnd, out var rect))
+        {
+            return false;
+        }
+
+        return point.X >= rect.Left
+            && point.X < rect.Right
+            && point.Y >= rect.Top
+            && point.Y < rect.Bottom;
     }
 
     private static string GetTitle(nint hwnd)

@@ -22,6 +22,7 @@ internal static class NativeMethods
     public static readonly nint DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = new(-4);
 
     public delegate nint LowLevelMouseProc(int nCode, nint wParam, nint lParam);
+    public delegate bool EnumWindowsProc(nint hwnd, nint lParam);
 
     [StructLayout(LayoutKind.Sequential)]
     public readonly struct POINT
@@ -118,6 +119,18 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetWindowRect(nint hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsWindowVisible(nint hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsIconic(nint hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, nint lParam);
 
     [DllImport("user32.dll")]
     public static extern nint MonitorFromWindow(nint hwnd, uint dwFlags);
