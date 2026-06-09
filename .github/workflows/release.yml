@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release tag, for example v0.1.0"
+        description: "Release tag, for example v0.1.1"
         required: true
-        default: "v0.1.0"
+        default: "v0.1.1"
 
 permissions:
   contents: write
@@ -46,7 +46,7 @@ jobs:
           name: ElectroScroll ${{ env.RELEASE_TAG }}
           prerelease: true
           body: |
-            Initial ElectroScroll prototype release.
+            ElectroScroll prototype release.
 
             This package contains a self-contained Windows x64 build, README files,
             and the MIT license.

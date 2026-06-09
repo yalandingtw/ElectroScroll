@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon />
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Authors>yalandingtw</Authors>
     <Copyright>Copyright (c) 2026 yalandingtw</Copyright>
   </PropertyGroup>

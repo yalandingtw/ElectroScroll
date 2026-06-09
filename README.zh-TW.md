@@ -59,13 +59,13 @@ dotnet build .\ElectroScroll.csproj -c Release -o .\bin\Release
 若要產生可放到 GitHub Releases 的 Windows x64 self-contained zip：
 
 ```powershell
-.\scripts\package-release.ps1 -Version 0.1.0
+.\scripts\package-release.ps1 -Version 0.1.1
 ```
 
 輸出位置：
 
 ```text
-artifacts\ElectroScroll-0.1.0-win-x64.zip
+artifacts\ElectroScroll-0.1.1-win-x64.zip
 ```
 
 zip 內容包含 single-file executable、`README.md`、`README.zh-TW.md` 與

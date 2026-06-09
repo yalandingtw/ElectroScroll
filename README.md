@@ -73,13 +73,13 @@ Safe UI-only mode, without installing the global mouse hook:
 To create a self-contained Windows x64 zip for GitHub Releases:
 
 ```powershell
-.\scripts\package-release.ps1 -Version 0.1.0
+.\scripts\package-release.ps1 -Version 0.1.1
 ```
 
 The package is written to:
 
 ```text
-artifacts\ElectroScroll-0.1.0-win-x64.zip
+artifacts\ElectroScroll-0.1.1-win-x64.zip
 ```
 
 The zip contains the single-file executable plus `README.md`,
