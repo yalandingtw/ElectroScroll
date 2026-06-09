@@ -109,6 +109,19 @@ The UI currently edits the default tuning profile. Advanced users can edit
 `settings.json` to adjust process-specific profiles or known game process names.
 Close ElectroScroll before editing the file manually.
 
+## Diagnostics
+
+The `Log` checkbox enables low-overhead file diagnostics. It is off by default.
+When enabled, ElectroScroll writes wheel input, target resolution, bypass reasons,
+profile decisions, output packets, and `PostMessage` results here:
+
+```text
+%APPDATA%\ElectroScroll\logs\electroscroll.log
+```
+
+The log is batched on a background timer and rotates to `electroscroll.1.log`
+after it reaches the configured size.
+
 ## Tuning Guide
 
 - `Step`: base distance per wheel tick. Higher values move farther even before
@@ -135,7 +148,7 @@ ElectroScroll keeps the hook path small:
 - root window process/title lookups are cached by HWND;
 - physics runs on a 4 ms timer when motion is active;
 - UI metrics are throttled;
-- diagnostic charts are disabled by default;
+- diagnostic charts and file logging are disabled by default;
 - injected low-level wheel events from other software are bypassed by the hook;
 - generated output uses `PostMessage` only.
 
@@ -144,7 +157,7 @@ app with `--no-hook`.
 
 ## Known Limitations
 
-- No installer or packaged release is provided yet.
+- No installer is provided yet.
 - The UI only edits the default profile, although per-app profile matching exists.
 - Some applications do not respond well to synthetic `WM_MOUSEWHEEL` messages.
 - Elevated/admin windows may require ElectroScroll to run with matching
@@ -166,6 +179,7 @@ Issues and experiments are welcome. When changing scroll behavior, please includ
 - the active preset/profile;
 - whether the app was in `Native`, `Intercepting`, or `Bypassed` mode;
 - a short description of the wheel motion that felt wrong.
+- the diagnostic log if `Log` was enabled while reproducing the issue.
 
 ## License
 

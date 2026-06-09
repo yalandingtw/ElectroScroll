@@ -11,10 +11,11 @@ public partial class MainWindow : Window
         AppSettings settings,
         ScrollController controller,
         SettingsStore store,
-        PerformanceModeStatus performanceModeStatus)
+        PerformanceModeStatus performanceModeStatus,
+        DiagnosticsLogger logger)
     {
         InitializeComponent();
-        DataContext = new MainViewModel(settings, controller, store, performanceModeStatus);
+        DataContext = new MainViewModel(settings, controller, store, performanceModeStatus, logger);
     }
 
     public bool AllowClose { get; set; }

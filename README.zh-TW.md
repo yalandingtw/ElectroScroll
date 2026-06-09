@@ -91,6 +91,18 @@ zip 內容包含 single-file executable、`README.md`、`README.zh-TW.md` 與
 
 目前 UI 只會編輯 default tuning profile。進階使用者可以直接修改 `settings.json`，調整特定應用程式 profile 或已知遊戲程序名稱。手動修改前建議先關閉 ElectroScroll。
 
+## 診斷紀錄
+
+`記錄` 勾選框會啟用低成本的檔案診斷，預設關閉。啟用後，ElectroScroll
+會記錄滾輪輸入、目標視窗解析、bypass 原因、profile 決策、輸出封包，以及
+`PostMessage` 結果：
+
+```text
+%APPDATA%\ElectroScroll\logs\electroscroll.log
+```
+
+log 會由背景 timer 批次寫入，達到設定大小後會輪替成 `electroscroll.1.log`。
+
 ## 參數調整指南
 
 - `Step`：每一格滾輪的基礎距離。調高後，即使還沒進入慣性也會滾得更遠。
@@ -110,7 +122,7 @@ ElectroScroll 盡量讓 hook path 保持很小：
 - root window 的 process/title 查詢會依 HWND 快取；
 - 有動作時 physics 使用 4 ms timer；
 - UI metrics 會節流；
-- 診斷線圖預設關閉；
+- 診斷線圖與檔案紀錄預設關閉；
 - 其他軟體注入的 low-level wheel event 會被 hook 放行；
 - 產生的輸出只使用 `PostMessage`。
 
@@ -118,7 +130,7 @@ ElectroScroll 盡量讓 hook path 保持很小：
 
 ## 已知限制
 
-- 目前沒有 installer 或 packaged release。
+- 目前沒有 installer。
 - 雖然已有 per-app profile matching，UI 目前只編輯 default profile。
 - 有些應用程式對合成 `WM_MOUSEWHEEL` 訊息支援不佳。
 - 權限較高的系統管理員視窗可能需要 ElectroScroll 以相同權限執行。
@@ -138,6 +150,7 @@ ElectroScroll 與 Logitech、Microsoft、OpenAI，或此 repository 提到的任
 - 當時使用的 preset/profile；
 - app 顯示的是 `Native`、`Intercepting` 還是 `Bypassed`；
 - 哪一種滾輪動作讓手感不對。
+- 如果重現問題時有啟用 `記錄`，請附上 diagnostic log。
 
 ## 授權
 

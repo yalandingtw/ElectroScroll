@@ -16,6 +16,7 @@ public sealed class ScrollController : IDisposable
     private readonly System.Threading.Timer _timer;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly AppSettings _settings;
+    private readonly DiagnosticsLogger? _logger;
 
     private double _lastWheelMs;
     private double _lastRawWheelMs;
@@ -43,9 +44,10 @@ public sealed class ScrollController : IDisposable
     public event EventHandler<ScrollMetrics>? MetricsUpdated;
     public event EventHandler? EnabledChanged;
 
-    public ScrollController(AppSettings settings)
+    public ScrollController(AppSettings settings, DiagnosticsLogger? logger = null)
     {
         _settings = settings;
+        _logger = logger;
         _interferenceGuard = new InterferenceGuard(settings);
         _activeProfile = settings.DefaultProfile;
         _lastFrameMs = NowMs;
@@ -74,6 +76,8 @@ public sealed class ScrollController : IDisposable
 
     public ScrollTuning DefaultTuning => _settings.DefaultProfile.Tuning;
 
+    private bool IsDiagnosticsLoggingEnabled => _logger?.Enabled == true;
+
     internal bool OnWheel(int wheelDelta, NativeMethods.POINT point)
     {
         if (!_settings.Enabled || wheelDelta == 0)
@@ -84,6 +88,11 @@ public sealed class ScrollController : IDisposable
         if (_settings.BypassWithModifiers && NativeMethods.IsModifierDown())
         {
             ResetMotion();
+            if (IsDiagnosticsLoggingEnabled)
+            {
+                _logger!.Log("bypass", $"reason=modifier delta={wheelDelta} pt={FormatPoint(point)}");
+            }
+
             return false;
         }
 
@@ -96,14 +105,29 @@ public sealed class ScrollController : IDisposable
         var target = _resolver.Resolve(point);
         if (target.IsEmpty)
         {
+            if (IsDiagnosticsLoggingEnabled)
+            {
+                _logger!.Log("target-empty", $"delta={wheelDelta} pt={FormatPoint(point)}");
+            }
+
             PublishMetrics(false, target, "Native", point);
             return false;
+        }
+
+        if (IsDiagnosticsLoggingEnabled)
+        {
+            _logger!.Log("wheel", $"delta={wheelDelta} pt={FormatPoint(point)} target={DescribeTarget(target)}");
         }
 
         var guard = _interferenceGuard.Evaluate(target, now);
         if (guard.ShouldBypass)
         {
             ResetMotion();
+            if (IsDiagnosticsLoggingEnabled)
+            {
+                _logger!.Log("bypass", $"reason={guard.Reason} delta={wheelDelta} target={DescribeTarget(target)}");
+            }
+
             PublishMetrics(false, target, $"Bypassed: {guard.Reason}");
             return false;
         }
@@ -114,6 +138,11 @@ public sealed class ScrollController : IDisposable
             if (!profile.Enabled)
             {
                 ResetMotionLocked();
+                if (IsDiagnosticsLoggingEnabled)
+                {
+                    _logger!.Log("bypass", $"reason=profile-disabled profile={profile.Name} target={DescribeTarget(target)}");
+                }
+
                 return false;
             }
 
@@ -122,6 +151,8 @@ public sealed class ScrollController : IDisposable
             var notches = wheelDelta / (double)NativeMethods.WHEEL_DELTA;
             var direction = Math.Sign(notches);
             var sameWindow = _target.RootHwnd != 0 && _target.RootHwnd == target.RootHwnd;
+            var accumulatorBefore = _accumulator;
+            var velocityBefore = _velocity;
             if (direction != 0 && _brakeTicksRemaining > 0 && direction == _brakeDirection && now <= _brakeUntilMs)
             {
                 _target = target;
@@ -133,6 +164,11 @@ public sealed class ScrollController : IDisposable
                 _velocity = 0;
                 _accumulator = 0;
                 _speedEma *= 0.2;
+                if (IsDiagnosticsLoggingEnabled)
+                {
+                    _logger!.Log("brake", $"phase=absorb delta={wheelDelta} ticksLeft={_brakeTicksRemaining} target={DescribeTarget(target)}");
+                }
+
                 PublishMetricsLocked(false, force: true);
                 return true;
             }
@@ -163,6 +199,11 @@ public sealed class ScrollController : IDisposable
                     _brakeDirection = direction;
                     _brakeTicksRemaining = 3;
                     _brakeUntilMs = now + 180;
+                    if (IsDiagnosticsLoggingEnabled)
+                    {
+                        _logger!.Log("brake", $"phase=start delta={wheelDelta} velocityBefore={velocityBefore:0.0000} accumulatorBefore={accumulatorBefore:0.0000} target={DescribeTarget(target)}");
+                    }
+
                     PublishMetricsLocked(false, force: true);
                     return true;
                 }
@@ -202,6 +243,11 @@ public sealed class ScrollController : IDisposable
             var inertiaMix = SmoothStep((triggerSpeed - tuning.Threshold) / Math.Max(0.0001, tuning.Threshold));
             if (inertiaMix <= 0.001 && Math.Abs(_velocity) < 0.004 && Math.Abs(_accumulator) < 0.01)
             {
+                if (IsDiagnosticsLoggingEnabled)
+                {
+                    _logger!.Log("native", $"profile={profile.Name} dt={dt:0.0} notches={notches:0.000} speed={instantSpeed:0.0000} trigger={triggerSpeed:0.0000} threshold={tuning.Threshold:0.0000} target={DescribeTarget(target)}");
+                }
+
                 PublishMetricsLocked(false, force: true);
                 return false;
             }
@@ -216,7 +262,14 @@ public sealed class ScrollController : IDisposable
                 _glideUntilMs = now + tuning.FrictionMs * (0.9 + tuning.Flywheel);
             }
 
-            EmitAccumulatorLocked(tuning);
+            var emitted = EmitAccumulatorLocked(tuning);
+            if (IsDiagnosticsLoggingEnabled)
+            {
+                _logger!.Log(
+                    "intercept",
+                    $"profile={profile.Name} dt={dt:0.0} notches={notches:0.000} speed={instantSpeed:0.0000} trigger={triggerSpeed:0.0000} boost={_boost:0.00} mix={inertiaMix:0.000} accBefore={accumulatorBefore:0.0000} accAfter={_accumulator:0.0000} velBefore={velocityBefore:0.0000} velAfter={_velocity:0.0000} emitted={emitted.Count} totalDelta={emitted.TotalDelta} target={DescribeTarget(target)}");
+            }
+
             PublishMetricsLocked(true, force: true);
             return true;
         }
@@ -304,7 +357,12 @@ public sealed class ScrollController : IDisposable
                 _outputSignal = 0;
             }
 
-            EmitAccumulatorLocked(tuning);
+            var emitted = EmitAccumulatorLocked(tuning);
+            if (emitted.Count > 0 && IsDiagnosticsLoggingEnabled)
+            {
+                _logger!.Log("tick-output", $"emitted={emitted.Count} totalDelta={emitted.TotalDelta} velocity={_velocity:0.0000} accumulator={_accumulator:0.0000} target={DescribeTarget(_target)}");
+            }
+
             var active = Math.Abs(_velocity) > 0.001 || Math.Abs(_accumulator) > 0.01;
             if (active)
             {
@@ -323,16 +381,17 @@ public sealed class ScrollController : IDisposable
             ?? _settings.DefaultProfile;
     }
 
-    private void EmitAccumulatorLocked(ScrollTuning tuning)
+    private EmissionResult EmitAccumulatorLocked(ScrollTuning tuning)
     {
         if (_target.Hwnd == 0)
         {
             _accumulator = 0;
-            return;
+            return new EmissionResult(0, 0);
         }
 
         var quantum = GetOutputQuantum(tuning.Smoothness);
         var emitted = 0;
+        var totalDelta = 0;
 
         while (Math.Abs(_accumulator) >= quantum && emitted < 20)
         {
@@ -340,18 +399,23 @@ public sealed class ScrollController : IDisposable
             var delta = (int)Math.Round(packet * NativeMethods.WHEEL_DELTA);
             if (delta != 0)
             {
-                EmitWheelPacket(delta);
+                if (EmitWheelPacket(delta))
+                {
+                    totalDelta += delta;
+                }
             }
 
             _accumulator -= packet;
             emitted++;
         }
+
+        return new EmissionResult(emitted, totalDelta);
     }
 
-    private void EmitWheelPacket(int delta)
+    private bool EmitWheelPacket(int delta)
     {
         TrackOutputSignal(delta);
-        EmitPostMessageWheel(delta);
+        return EmitPostMessageWheel(delta);
     }
 
     private void TrackOutputSignal(int delta)
@@ -367,7 +431,7 @@ public sealed class ScrollController : IDisposable
         _lastRawWheelMs = now;
     }
 
-    private void EmitPostMessageWheel(int delta)
+    private bool EmitPostMessageWheel(int delta)
     {
         var target = _target;
         var point = _targetPoint;
@@ -385,7 +449,13 @@ public sealed class ScrollController : IDisposable
         var hwnd = ShouldPostToRootWindow(_activeProfile, point) ? target.RootHwnd : target.Hwnd;
         _lastOutputHwnd = hwnd;
         _lastOutputPoint = point;
-        NativeMethods.PostMouseWheel(hwnd, delta, point);
+        var posted = NativeMethods.PostMouseWheel(hwnd, delta, point);
+        if (IsDiagnosticsLoggingEnabled)
+        {
+            _logger!.Log("post", $"ok={posted} delta={delta} hwnd={FormatHwnd(hwnd)} root={FormatHwnd(target.RootHwnd)} pt={FormatPoint(point)} target={DescribeTarget(target)}");
+        }
+
+        return posted;
     }
 
     private static bool ShouldPostToRootWindow(AppProfile profile, NativeMethods.POINT point)
@@ -507,6 +577,16 @@ public sealed class ScrollController : IDisposable
         return $"pt=({point.X},{point.Y}) mon={DescribeMonitor(point)} hwnd={FormatHwnd(target.Hwnd)} root={FormatHwnd(target.RootHwnd)} fg={FormatHwnd(NativeMethods.GetForegroundWindow())} out={FormatHwnd(outputHwnd)}";
     }
 
+    private static string DescribeTarget(WindowTarget target)
+    {
+        return $"process={Clean(target.ProcessName)} title={Clean(target.Title)} hwnd={FormatHwnd(target.Hwnd)} root={FormatHwnd(target.RootHwnd)}";
+    }
+
+    private static string FormatPoint(NativeMethods.POINT point)
+    {
+        return $"({point.X},{point.Y})";
+    }
+
     private static string DescribeMonitor(NativeMethods.POINT point)
     {
         var monitor = NativeMethods.MonitorFromPoint(point, NativeMethods.MONITOR_DEFAULTTONEAREST);
@@ -550,6 +630,14 @@ public sealed class ScrollController : IDisposable
         return $"0x{hwnd.ToInt64():X}";
     }
 
+    private static string Clean(string value)
+    {
+        return value
+            .Replace('\t', ' ')
+            .Replace('\r', ' ')
+            .Replace('\n', ' ');
+    }
+
     private static double SmoothStep(double value)
     {
         var x = Clamp(value, 0, 1);
@@ -560,4 +648,6 @@ public sealed class ScrollController : IDisposable
     {
         return Math.Min(max, Math.Max(min, value));
     }
+
+    private readonly record struct EmissionResult(int Count, int TotalDelta);
 }

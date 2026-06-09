@@ -12,6 +12,7 @@ public sealed class LocalizedText : INotifyPropertyChanged
         ["Modifiers"] = ("Modifiers", "修飾鍵"),
         ["Fullscreen"] = ("Fullscreen", "全螢幕"),
         ["Games"] = ("Games", "遊戲"),
+        ["Log"] = ("Log", "記錄"),
         ["Language"] = ("Language", "語言"),
 
         ["Presets"] = ("Presets", "預設"),

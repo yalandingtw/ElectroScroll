@@ -10,6 +10,7 @@ public partial class App : System.Windows.Application
     private SettingsStore? _store;
     private Models.AppSettings? _settings;
     private PerformanceModeService? _performanceMode;
+    private DiagnosticsLogger? _logger;
     private ScrollController? _controller;
     private LowLevelMouseHook? _hook;
     private TrayService? _tray;
@@ -36,12 +37,13 @@ public partial class App : System.Windows.Application
 
         _store = new SettingsStore();
         _settings = _store.Load();
+        _logger = new DiagnosticsLogger(_settings);
         _performanceMode = new PerformanceModeService(_settings);
         if (!noHook)
         {
             _performanceMode.Apply();
         }
-        _controller = new ScrollController(_settings);
+        _controller = new ScrollController(_settings, _logger);
 
         if (!noHook)
         {
@@ -63,7 +65,7 @@ public partial class App : System.Windows.Application
             }
         }
 
-        _mainWindow = new MainWindow(_settings, _controller, _store, _performanceMode.Status);
+        _mainWindow = new MainWindow(_settings, _controller, _store, _performanceMode.Status, _logger);
         _tray = new TrayService(_mainWindow, _settings, _controller);
 
         if (!_settings.StartMinimized)
@@ -87,6 +89,7 @@ public partial class App : System.Windows.Application
         _tray?.Dispose();
         _hook?.Dispose();
         _controller?.Dispose();
+        _logger?.Dispose();
         _performanceMode?.Dispose();
         _singleInstanceMutex?.Dispose();
 

@@ -18,6 +18,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private readonly AppSettings _settings;
     private readonly ScrollController _controller;
     private readonly SettingsStore _store;
+    private readonly DiagnosticsLogger _logger;
     private readonly Queue<double> _inputSamples = new();
     private readonly Queue<double> _outputSamples = new();
     private readonly Stopwatch _chartClock = Stopwatch.StartNew();
@@ -42,11 +43,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
         AppSettings settings,
         ScrollController controller,
         SettingsStore store,
-        PerformanceModeStatus performanceModeStatus)
+        PerformanceModeStatus performanceModeStatus,
+        DiagnosticsLogger logger)
     {
         _settings = settings;
         _controller = controller;
         _store = store;
+        _logger = logger;
         _performanceModeStatus = performanceModeStatus;
         Text = new LocalizedText(settings.Language);
         _saveStatus = Text["SettingsLoaded"];
@@ -97,6 +100,31 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     public Visibility ChartVisibility => ChartsEnabled ? Visibility.Visible : Visibility.Collapsed;
+
+    public bool DiagnosticsLoggingEnabled
+    {
+        get => _settings.DiagnosticsLoggingEnabled;
+        set
+        {
+            if (_settings.DiagnosticsLoggingEnabled == value)
+            {
+                return;
+            }
+
+            if (value)
+            {
+                _settings.DiagnosticsLoggingEnabled = true;
+                _logger.Log("logging", $"enabled=true path={_logger.LogPath}");
+            }
+            else
+            {
+                _logger.Log("logging", "enabled=false");
+                _settings.DiagnosticsLoggingEnabled = false;
+            }
+
+            OnPropertyChanged();
+        }
+    }
 
     public PointCollection InputChartPoints
     {

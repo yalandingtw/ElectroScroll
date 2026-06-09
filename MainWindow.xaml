@@ -104,6 +104,9 @@
                     <CheckBox Content="{Binding Text[Games]}"
                               IsChecked="{Binding AutoBypassKnownGames, Mode=TwoWay}"
                               Margin="0,0,12,0" />
+                    <CheckBox Content="{Binding Text[Log]}"
+                              IsChecked="{Binding DiagnosticsLoggingEnabled, Mode=TwoWay}"
+                              Margin="0,0,12,0" />
                     <TextBlock Text="{Binding Text[Language]}"
                                Foreground="{StaticResource MutedBrush}"
                                VerticalAlignment="Center"

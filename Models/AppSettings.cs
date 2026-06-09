@@ -9,6 +9,8 @@ public sealed class AppSettings
     public bool AutoBypassFullscreen { get; set; } = true;
     public bool AutoBypassKnownGames { get; set; } = true;
     public bool DiagnosticsChartEnabled { get; set; }
+    public bool DiagnosticsLoggingEnabled { get; set; }
+    public int DiagnosticsLogMaxBytes { get; set; } = 1_000_000;
     public UiLanguage Language { get; set; } = UiLanguage.English;
     public List<string> GameProcessNames { get; set; } =
     [
